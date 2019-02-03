@@ -2,27 +2,52 @@
   "name": "drupal-node.js",
   "description": "Push notifications from Drupal.",
   "version": "1.0.11",
-  "homepage": "https://github.com/beejeebus/drupal-nodejs",
+  "homepage": "https://github.com/casmbu/drupal-nodejs-typescript",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/beejeebus/drupal-nodejs.git"
+    "url": "git+https://github.com/casmbu/drupal-nodejs-typescript.git"
   },
   "license": "GPL-2.0",
   "engines": {
     "node": ">=8.0.0"
   },
   "scripts": {
-    "test": "node_modules/.bin/mocha"
+    "build_all": "run-p build build_example_extension",
+    "build": "webpack --config webpack.config.js",
+    "build_example_extension": "webpack --config example_extension.webpack.config.js",
+    "test": "ts-mocha -p tsconfig.json src/**/*.spec.ts",
+    "tsc": "tsc",
+    "webpack": "webpack"
   },
   "dependencies": {
+    "body-parser": "1.18.x",
     "express": "4.16.x",
     "request": "2.88.x",
-    "body-parser": "1.18.x",
-    "socket.io": "2.2.x"
+    "socket.io": "2.2.x",
+    "socket.io-client": "2.2.x"
   },
   "devDependencies": {
-    "mocha": "5.2.x",
+    "@types/body-parser": "^1.17.0",
+    "@types/express": "^4.16.1",
+    "@types/mocha": "^5.2.5",
+    "@types/nock": "^9.3.1",
+    "@types/node": "^10.12.20",
+    "@types/socket.io-client": "^1.4.32",
+    "eslint": "^5.12.1",
+    "eslint-config-airbnb-base": "^13.1.0",
+    "eslint-plugin-import": "^2.16.0",
+    "mocha": "^5.2.0",
     "nock": "10.0.x",
-    "socket.io-client": "2.2.x"
+    "npm-run-all": "^4.1.5",
+    "ts-loader": "^5.3.3",
+    "ts-mocha": "^2.0.0",
+    "ts-node": "^8.0.2",
+    "tslint": "^5.12.1",
+    "tslint-config-airbnb-base": "^0.2.0",
+    "typescript": "^3.2.4",
+    "uws": "10.148.1",
+    "webpack": "^4.29.0",
+    "webpack-cli": "^3.2.1",
+    "webpack-node-externals": "^1.7.2"
   }
 }

@@ -1,0 +1,17 @@
+{
+  "name": "drupal-node.js",
+  "description": "Push notifications from Drupal.",
+  "engines": {
+    "node": ">=8.0.0"
+  },
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "body-parser": "1.18.x",
+    "express": "4.16.x",
+    "request": "2.88.x",
+    "socket.io": "2.2.x",
+    "socket.io-client": "2.2.x"
+  }
+}

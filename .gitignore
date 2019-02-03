@@ -25,3 +25,6 @@ nodejs.config.js
 # beejeebus' vim ctags file
 tags
 
+# Compiled TypeScript
+dist/*.js
+dist/package-lock.json

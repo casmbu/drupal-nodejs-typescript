@@ -24,6 +24,8 @@
  * debug: Whether to write a bunch of debug information to the console. false
  * by default.
  *
+ * showLogs: Show the log messages invoked by the Logger utility of this server.
+ *
  * baseAuthPath: base path for all requests from the backend. This is used to
  * set the authentication call for all requests from the backend. Defaults to
  * '/nodejs/'.
@@ -87,11 +89,14 @@ settings = {
     messagePath: '/nodejs/message'
   },
   debug: false,
+  showLogs: true,
   sslKeyPath: '',
   sslCertPath: '',
   sslCAPath: '',
   baseAuthPath: '/nodejs/',
-  extensions: [],
+  extensions: [
+    'example_extension'
+  ],
   clientsCanWriteToChannels: false,
   clientsCanWriteToClients: false,
   transports: ['websocket', 'polling'],
@@ -99,4 +104,3 @@ settings = {
   jsEtag: true,
   logLevel: 1
 };
-
