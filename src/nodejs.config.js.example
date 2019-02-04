@@ -95,7 +95,7 @@ settings = {
   sslCAPath: '',
   baseAuthPath: '/nodejs/',
   extensions: [
-    'example_extension'
+    'example_extension.bundle'
   ],
   clientsCanWriteToChannels: false,
   clientsCanWriteToClients: false,

@@ -6,6 +6,8 @@ import { runInThisContext } from 'vm';
 import { readFileSync } from 'fs';
 import { Logger } from './utility';
 
+const actualRequire = typeof __webpack_require__ === 'function' ? __non_webpack_require__ : require;
+
 export class ConfigManager {
   settings: any = undefined;
   extensions: any = [];
@@ -107,7 +109,7 @@ export class ConfigManager {
           // Load JS files for extensions as modules, and collect the returned
           // object for each extension.
           this.extensions.push(
-            require(`${__dirname}/../extensions/${this.settings.extensions[i]}`),
+            actualRequire(`${__dirname}/extensions/${this.settings.extensions[i]}`),
           );
           this.logger.log(`Extension loaded: ${this.settings.extensions[i]}`);
         }
