@@ -64,3 +64,33 @@ automatically restart it if the app quits. See the
 
 Visit the status report on your Drupal site to verify if Drupal is able to
 communicate with the server app.
+
+## Building extensions
+
+It's easiest to build extensions with the server in the same way that the
+example_extension is built. However, you can copy these files into a separate
+project and build it separately:
+
+```
+./src/extensions/example_extension.ts
+./example_extension.webpack.config.js
+./tsconfig.json
+```
+
+You can optionally copy the various configuration files as well or make your
+own:
+
+```
+./.eslintrc.json
+./tslint.json
+```
+
+Once you have an extension built, you can install it by copying it to the root
+directory of the server in the `extensions` folder. You probably will want to
+have a `package.json` file similar to the server's `server.package.json` that
+you keep in your extension's install folder to install dependencies.
+
+If you plan to use typescript to build extensions, you will want to have a
+`drupal-nodejs-typescript.d.ts` type definition for the server types as well.
+There isn't currently one that can be copied over. A simple stand-in one can be
+created by assigning the `any` type to all of the types you need to use.

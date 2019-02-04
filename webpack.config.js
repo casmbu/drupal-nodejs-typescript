@@ -17,6 +17,7 @@ module.exports = {
   },
   externals: [
     nodeExternals(),
+    // exclude any extensions from being packaged into this app
     function (context, request, callback) {
       if (/\bextensions\b/.test(context)) {
         return callback(null, 'commonjs ' + request);
