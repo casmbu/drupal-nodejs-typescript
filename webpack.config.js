@@ -1,5 +1,11 @@
 const path = require('path');
 const nodeExternals = require('webpack-node-externals');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
+
+const additionalAssets = new CopyWebpackPlugin([
+  { from: './src/nodejs.config.js.example', to: 'nodejs.config.js.example' },
+  { from: './src/server.package.json', to: 'package.json' },
+]);
 
 module.exports = {
   entry: {
@@ -11,8 +17,8 @@ module.exports = {
   },
   externals: [
     nodeExternals(),
-    function(context, request, callback) {
-      if (/\bextensions\b/.test(context)){
+    function (context, request, callback) {
+      if (/\bextensions\b/.test(context)) {
         return callback(null, 'commonjs ' + request);
       }
       callback();
@@ -41,9 +47,12 @@ module.exports = {
   optimization: {
     // setting this to false can help with debugging but should use true for
     // building a production version of the server.
-    minimize: true,
+    minimize: false,
   },
   node: {
     __dirname: false,
   },
+  plugins: [
+    additionalAssets,
+  ],
 };
