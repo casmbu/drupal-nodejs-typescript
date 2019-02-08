@@ -12,7 +12,5 @@ const configFile = process.argv[2] ? process.argv[2] : process.cwd() + '/nodejs.
 const packageInfo = require('../package.json');
 global.version = packageInfo.version;
 
-const configManager = new ConfigManager();
-configManager.readFromDisk(configFile);
-const server = new DrupalServer();
-server.start(configManager);
+const configManager = new ConfigManager(configFile);
+DrupalServer.start(configManager);

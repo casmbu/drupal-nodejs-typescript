@@ -5,7 +5,7 @@ module.exports = {
   entry: {
     example_extension: './src/extensions/example_extension.ts',
   },
-  devtool: 'none',
+  devtool: 'inline-source-map',
   devServer: {
     contentBase: './dist/extensions',
   },
@@ -31,11 +31,11 @@ module.exports = {
     libraryTarget: 'commonjs',
   },
   target: 'node',
-  mode: 'production',
+  mode: 'development',
   optimization: {
     // setting this to false can help with debugging but should use true for
-    // building a production version of the server.
-    minimize: true,
+    // building a production version of the extension.
+    minimize: false,
   },
   node: {
     __dirname: false,

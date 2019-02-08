@@ -10,52 +10,52 @@ import { json } from 'body-parser';
 import { Routes } from './routes';
 import { Backend } from './backend';
 import { ClientManager } from './client-manager';
-import { ConfigManager } from './config-manager';
+import { ConfigManager, ioTransport } from './config-manager';
 import { Logger } from './utility';
 
 export class DrupalServer {
   /**
    * Starts the server.
    */
-  start(configManager: ConfigManager) {
-    const settings = configManager.getSettings();
+  static start(configManager: ConfigManager) {
+    const nodeSettings = configManager.getNodeSettings();
+    const backendSettings = configManager.getBackendSettings();
     const app = express();
 
-    const backend = new Backend(settings);
-    const clientManager = new ClientManager(settings, backend);
-    const routes = new Routes();
+    const backend = new Backend(nodeSettings, backendSettings);
+    const clientManager = new ClientManager(nodeSettings, backend);
 
-    const logger = new Logger(settings);
+    const logger = new Logger(nodeSettings);
 
     // Allow extensions to  override route callbacks.
-    configManager.invokeExtensions('alterRoutes', routes);
+    configManager.invokeExtensions('alterRoutes', Routes);
 
-    app.use(json({}));
+    app.use(json());
 
-    app.use((request: any, response: any, next: any) => {
+    app.use((req, res, next) => {
       // Make objects available to route callbacks.
       // (Needed because route callbacks cannot access properties via the 'this' keyword.)
-      request.clientManager = clientManager;
+      req.clientManager = clientManager;
       next();
     });
 
-    app.all(settings.baseAuthPath + '*', routes.checkServiceKey);
-    app.post(settings.baseAuthPath + 'publish', routes.publishMessage);
-    app.post(settings.baseAuthPath + 'user/kick/:uid', routes.kickUser);
-    app.post(settings.baseAuthPath + 'user/logout/:authtoken', routes.logoutUser);
-    app.post(settings.baseAuthPath + 'user/channel/add/:channel/:uid', routes.addUserToChannel);
-    app.post(settings.baseAuthPath + 'user/channel/remove/:channel/:uid', routes.removeUserFromChannel);
-    app.post(settings.baseAuthPath + 'channel/add/:channel', routes.addChannel);
-    app.get(settings.baseAuthPath + 'health/check', routes.healthCheck);
-    app.get(settings.baseAuthPath + 'channel/check/:channel', routes.checkChannel);
-    app.post(settings.baseAuthPath + 'channel/remove/:channel', routes.removeChannel);
-    app.get(settings.baseAuthPath + 'user/presence-list/:uid/:uidList', routes.setUserPresenceList);
-    app.post(settings.baseAuthPath + 'debug/toggle', routes.toggleDebug);
-    app.post(settings.baseAuthPath + 'content/token/users', routes.getContentTokenUsers);
-    app.post(settings.baseAuthPath + 'content/token', routes.setContentToken);
-    app.post(settings.baseAuthPath + 'content/token/message', routes.publishMessageToContentChannel);
-    app.post(settings.baseAuthPath + 'authtoken/channel/add/:channel/:authToken', routes.addAuthTokenToChannel);
-    app.post(settings.baseAuthPath + 'authtoken/channel/remove/:channel/:authToken', routes.removeAuthTokenFromChannel);
+    app.all(nodeSettings.baseAuthPath + '*', Routes.checkServiceKey);
+    app.post(nodeSettings.baseAuthPath + 'publish', Routes.publishMessage);
+    app.post(nodeSettings.baseAuthPath + 'user/kick/:uid', Routes.kickUser);
+    app.post(nodeSettings.baseAuthPath + 'user/logout/:authtoken', Routes.logoutUser);
+    app.post(nodeSettings.baseAuthPath + 'user/channel/add/:channel/:uid', Routes.addUserToChannel);
+    app.post(nodeSettings.baseAuthPath + 'user/channel/remove/:channel/:uid', Routes.removeUserFromChannel);
+    app.post(nodeSettings.baseAuthPath + 'channel/add/:channel', Routes.addChannel);
+    app.get(nodeSettings.baseAuthPath + 'health/check', Routes.healthCheck);
+    app.get(nodeSettings.baseAuthPath + 'channel/check/:channel', Routes.checkChannel);
+    app.post(nodeSettings.baseAuthPath + 'channel/remove/:channel', Routes.removeChannel);
+    app.get(nodeSettings.baseAuthPath + 'user/presence-list/:uid/:uidList', Routes.setUserPresenceList);
+    app.post(nodeSettings.baseAuthPath + 'debug/toggle', Routes.toggleDebug);
+    app.post(nodeSettings.baseAuthPath + 'content/token/users', Routes.getContentTokenUsers);
+    app.post(nodeSettings.baseAuthPath + 'content/token', Routes.setContentToken);
+    app.post(nodeSettings.baseAuthPath + 'content/token/message', Routes.publishMessageToContentChannel);
+    app.post(nodeSettings.baseAuthPath + 'authtoken/channel/add/:channel/:authToken', Routes.addAuthTokenToChannel);
+    app.post(nodeSettings.baseAuthPath + 'authtoken/channel/remove/:channel/:authToken', Routes.removeAuthTokenFromChannel);
 
     // Allow extensions to add routes.
     const extensionRoutes = configManager.getExtensionRoutes();
@@ -68,19 +68,27 @@ export class DrupalServer {
       }
     });
 
-    app.get('*', routes.send404);
+    app.get('*', Routes.send404);
 
     let httpServer;
-    if (settings.scheme === 'https') {
-      const sslOptions: any = {
-        key: readFileSync(settings.sslKeyPath),
-        cert: readFileSync(settings.sslCertPath),
+    if (nodeSettings.scheme === 'https') {
+      if (!nodeSettings.sslKeyPath) throw new Error('sslKeyPath not specified');
+      if (!nodeSettings.sslCertPath) throw new Error('sslCertPath not specified');
+
+      const sslOptions: {
+        key: Buffer,
+        cert: Buffer,
+        ca?: Buffer,
+        passphrase?: string,
+      } = {
+        key: readFileSync(nodeSettings.sslKeyPath),
+        cert: readFileSync(nodeSettings.sslCertPath),
       };
-      if (settings.sslCAPath) {
-        sslOptions.ca = readFileSync(settings.sslCAPath);
+      if (nodeSettings.sslCAPath) {
+        sslOptions.ca = readFileSync(nodeSettings.sslCAPath);
       }
-      if (settings.sslPassPhrase) {
-        sslOptions.passphrase = settings.sslPassPhrase;
+      if (nodeSettings.sslPassPhrase) {
+        sslOptions.passphrase = nodeSettings.sslPassPhrase;
       }
       httpServer = _createServer(sslOptions, app);
     }
@@ -88,25 +96,32 @@ export class DrupalServer {
       httpServer = createServer(app);
     }
 
-    httpServer.listen(settings.port, settings.host);
-    logger.log(`Started ${settings.scheme} server.`);
+    httpServer.listen(nodeSettings.port, nodeSettings.host);
+    logger.log(`Started ${nodeSettings.scheme} server.`);
 
-    const ioOptions: any = {};
-    ioOptions['transports'] = settings.transports;
-    ioOptions['log level'] = settings.logLevel;
-    ioOptions['port'] = settings.port;
+    const ioOptions: {
+      transports: ioTransport[],
+      'log level': number,
+      port: number,
+      'browser client etag'?: boolean,
+      'browser client minification'?: boolean,
+    } = {
+      transports: nodeSettings.transports,
+      'log level': nodeSettings.logLevel,
+      port: nodeSettings.port,
+    };
 
-    if (settings.jsEtag) {
+    if (nodeSettings.jsEtag) {
       ioOptions['browser client etag'] = true;
     }
-    if (settings.jsMinification) {
+    if (nodeSettings.jsMinification) {
       ioOptions['browser client minification'] = true;
     }
 
     const io = require('socket.io')(httpServer, ioOptions);
 
-    io.set('resource', settings.resource);
-    io.set('transports', settings.transports);
+    io.set('resource', nodeSettings.resource);
+    io.set('transports', nodeSettings.transports);
 
     io.on(
       'connection',

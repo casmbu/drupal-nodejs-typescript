@@ -88,7 +88,7 @@ settings = {
     basePath: '',
     messagePath: '/nodejs/message'
   },
-  debug: false,
+  debug: true,
   showLogs: true,
   sslKeyPath: '',
   sslCertPath: '',

@@ -6,27 +6,36 @@ import { post } from 'request';
 import { stringify } from 'querystring';
 import { format } from 'url';
 import { Logger } from './utility';
+import { IDrupalNodejsSettings, IDrupalBackendSettings } from './config-manager';
 
 export class Backend {
-  settings: any;
-  logger: Logger;
+  private readonly nodeSettings: IDrupalNodejsSettings;
+  private readonly backendSettings: IDrupalBackendSettings;
+  private readonly logger: Logger;
 
-  constructor(settings: any) {
-    this.settings = settings;
+  constructor(nodeSettings: IDrupalNodejsSettings, backendSettings: IDrupalBackendSettings) {
+    this.nodeSettings = nodeSettings;
+    this.backendSettings = backendSettings;
 
-    this.logger = new Logger(this.settings);
+    this.logger = new Logger(this.nodeSettings);
   }
 
   /**
-   * Check a service key against the configured service key.
+   * Check a service key against the configured service key. This does a secure
+   * string comparison that should take a consistent amount of time to do based
+   * on the input string's length.
    */
-  checkServiceKey(serviceKey: any) {
-    // tslint:disable-next-line:triple-equals
-    if (this.settings.serviceKey && serviceKey != this.settings.serviceKey) {
-      this.logger.log(
-        `checkServiceKey: Invalid service key ${serviceKey}, expecting ${this.settings.serviceKey}`,
-      );
-      return false;
+  checkServiceKey(serviceKey: string = '') {
+    if (this.nodeSettings.serviceKey) {
+      let mismatch = 0;
+      for (let i = 0; i < serviceKey.length; i += 1) {
+        // tslint:disable-next-line:no-bitwise
+        mismatch |= (serviceKey.charCodeAt(i) ^ this.nodeSettings.serviceKey.charCodeAt(i));
+      }
+      if (serviceKey.length !== this.nodeSettings.serviceKey.length || mismatch) {
+        this.logger.log(`checkServiceKey: Invalid service key ${serviceKey}`);
+        return false;
+      }
     }
     return true;
   }
@@ -36,10 +45,10 @@ export class Backend {
    */
   getBackendUrl() {
     return format({
-      protocol: this.settings.backend.scheme,
-      hostname: this.settings.backend.host,
-      port: this.settings.backend.port,
-      pathname: this.settings.backend.basePath + this.settings.backend.messagePath,
+      protocol: this.backendSettings.scheme,
+      hostname: this.backendSettings.host,
+      port: this.backendSettings.port,
+      pathname: this.backendSettings.basePath + this.backendSettings.messagePath,
     });
   }
 
@@ -47,8 +56,8 @@ export class Backend {
    * Returns the header for backend requests.
    */
   getAuthHeader() {
-    if (this.settings.backend.httpAuth.length > 0) {
-      return 'Basic ' + new Buffer(this.settings.backend.httpAuth).toString('base64');
+    if (this.backendSettings.httpAuth.length > 0) {
+      return 'Basic ' + new Buffer(this.backendSettings.httpAuth).toString('base64');
     }
     return false;
   }
@@ -59,7 +68,7 @@ export class Backend {
   sendMessageToBackend(message: any, callback?: Function) {
     const requestBody = stringify({
       messageJson: JSON.stringify(message),
-      serviceKey: this.settings.serviceKey,
+      serviceKey: this.nodeSettings.serviceKey,
     });
 
     const options: any = {
@@ -71,8 +80,8 @@ export class Backend {
       },
     };
 
-    if (this.settings.backend.scheme === 'https') {
-      options.strictSSL = this.settings.backend.strictSSL;
+    if (this.backendSettings.scheme === 'https') {
+      options.strictSSL = this.backendSettings.strictSSL;
     }
 
     const httpAuthHeader = this.getAuthHeader();

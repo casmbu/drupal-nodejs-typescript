@@ -2,9 +2,19 @@
  * Example extension.
  */
 
+import { RequestHandler } from 'express';
 import { ClientManager } from '../lib/client-manager';
+import { IDrupalNodejsExtension } from '../lib/extension-interface';
+import { IDrupalNodejsExtensionRoute, Routes } from '../lib/routes';
 
-class ExampleExtension {
+export default class ExampleExtension implements IDrupalNodejsExtension {
+  /**
+   * Route handler for the custom route.
+   */
+  exampleRouteHandler: RequestHandler = (request, response) => {
+    response.send({ text: 'Hello world.' });
+  }
+
   /**
    * Defines custom routes.
    *
@@ -16,27 +26,18 @@ class ExampleExtension {
    *     be called if the key is valid. This will also prepend the baseAuthPath
    *     to the path. E.g. the path /example might become /nodejs/example.
    */
-  routes: any = [
-    {
-      path: '/example',
-      type: 'get',
-      auth: false,
-      handler: this.exampleRouteHandler,
-    },
-  ];
-
-  /**
-   * Route handler for the custom route.
-   */
-  exampleRouteHandler(request: any, response: any) {
-    response.send({ text: 'Hello world.' });
-  }
+  routes = [{
+    path: '/example',
+    type: 'get',
+    auth: false,
+    handler: this.exampleRouteHandler,
+  } as IDrupalNodejsExtensionRoute];
 
   /**
    * Implements the alterRoutes hook.
    * Use this hook to override routes defined in routes.js.
    */
-  alterRoutes(routes: any) {
+  alterRoutes(routes: Routes) {
     console.log('Example extension alterRoutes called'); // tslint:disable-line:no-console
   }
 
@@ -96,5 +97,3 @@ class ExampleExtension {
     });
   }
 }
-
-module.exports = new ExampleExtension();

@@ -11,7 +11,7 @@ module.exports = {
   entry: {
     app: './src/app.ts',
   },
-  devtool: 'none',
+  devtool: 'inline-source-map',
   devServer: {
     contentBase: './dist',
   },
@@ -44,7 +44,7 @@ module.exports = {
     libraryTarget: 'commonjs',
   },
   target: 'node',
-  mode: 'production',
+  mode: 'development',
   optimization: {
     // setting this to false can help with debugging but should use true for
     // building a production version of the server.

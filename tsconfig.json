@@ -1,9 +1,14 @@
 {
   "compilerOptions": {
+    "outDir": "./dist/",
+    "sourceMap": true,
     "target": "es6",
     "module": "esnext",
-    "strict": true,
     "moduleResolution": "node",
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
+    "strict": true,
   }
 }

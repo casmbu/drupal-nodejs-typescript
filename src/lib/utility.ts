@@ -1,14 +1,16 @@
+import { IDrupalNodejsSettings } from './config-manager';
+
 /*
  * Submodule for utility functions.
  */
 
 export class Logger {
-  settings: any;
+  settings: IDrupalNodejsSettings;
 
   /**
    * Constructor for the logger.
    */
-  constructor(settings: any) {
+  constructor(settings: IDrupalNodejsSettings) {
     this.settings = settings;
   }
 
@@ -20,7 +22,7 @@ export class Logger {
    * @param data
    *   An object to print.
    */
-  debug(message: any, data?: any) {
+  debug(message: string, data?: Object) {
     if (!this.settings.debug) {
       return;
     }
@@ -31,7 +33,7 @@ export class Logger {
   /**
    * Logs a message unconditionally.
    */
-  log(message: any, data?: any) {
+  log(message: string, data?: Object) {
     if (this.settings.showLogs) {
       console.log(this.getTimestamp(), message); // tslint:disable-line:no-console
       if (data) {
@@ -58,8 +60,8 @@ export class Logger {
   /**
    * Pads a value to two digits.
    */
-  pad(value: any) {
+  pad(value: number): string {
     // tslint:disable-next-line:no-magic-numbers
-    return value < 10 ? '0' + value : value;
+    return value < 10 ? '0' + value : value + '';
   }
 }

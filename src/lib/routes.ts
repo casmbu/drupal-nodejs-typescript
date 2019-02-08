@@ -2,25 +2,37 @@
  * Submodule for router callbacks.
  */
 
-export class Routes {
-  /**
-   * Constructor.
-   */
-  constructor() {
-    // Dependencies are injected by a middleware into the request object in each route callback.
-    // Available objects:
-    //   - request.clientManager
-    //   - request.clientManager.backend
-    //   - request.clientManager.settings
-  }
+import { RequestHandler } from 'express';
 
+type RequestType = 'get' | 'post';
+
+export interface IDrupalNodejsRoute {
+  path: string;
+  type: RequestType;
+  handler: RequestHandler;
+}
+
+export interface IDrupalNodejsExtensionRoute extends IDrupalNodejsRoute {
+  auth: boolean;
+}
+
+/**
+ * Dependencies are injected by a middleware into the request object in each
+ * route callback. Available objects:
+ * @param req.clientManager
+ * @param req.clientManager.backend
+ * @param req.clientManager.settings
+ */
+export class Routes {
   /**
    * Callback that wraps all requests and checks for a valid service key.
    */
-  checkServiceKey(request: any, response: any, next: any) {
+  static checkServiceKey: RequestHandler = (request, response, next) => {
+    if (!request.clientManager) throw new Error('ClientManager is not available');
+
     request.clientManager.logger.debug('Route callback: checkServiceKey');
 
-    if (request.clientManager.backend.checkServiceKey(request.header('NodejsServiceKey', ''))) {
+    if (request.clientManager.backend.checkServiceKey(request.header('NodejsServiceKey'))) {
       next();
     }
     else {
@@ -31,7 +43,9 @@ export class Routes {
   /**
    * Http callback - read in a JSON message and publish it to interested clients.
    */
-  publishMessage(request: any, response: any) {
+  static publishMessage: RequestHandler = (request, response) => {
+    if (!request.clientManager) throw new Error('ClientManager is not available');
+
     request.clientManager.logger.debug('Route callback: publishMessage');
     request.clientManager.logger.debug('Body', request.body);
 
@@ -57,7 +71,9 @@ export class Routes {
   /**
    * Kicks the given logged in user from the server.
    */
-  kickUser(request: any, response: any) {
+  static kickUser: RequestHandler = (request, response) => {
+    if (!request.clientManager) throw new Error('ClientManager is not available');
+
     request.clientManager.logger.debug('Route callback: kickUser');
 
     if (request.params.uid) {
@@ -74,7 +90,9 @@ export class Routes {
   /**
    * Logout the given user from the server.
    */
-  logoutUser(request: any, response: any) {
+  static logoutUser: RequestHandler = (request, response) => {
+    if (!request.clientManager) throw new Error('ClientManager is not available');
+
     request.clientManager.logger.debug('Route callback: logoutUser');
 
     const authToken = request.params.authtoken || '';
@@ -94,7 +112,9 @@ export class Routes {
   /**
    * Add a user to a channel.
    */
-  addUserToChannel(request: any, response: any) {
+  static addUserToChannel: RequestHandler = (request, response) => {
+    if (!request.clientManager) throw new Error('ClientManager is not available');
+
     request.clientManager.logger.debug('Route callback: addUserToChannel');
 
     const uid = request.params.uid || '';
@@ -129,7 +149,9 @@ export class Routes {
   /**
    * Remove a user from a channel.
    */
-  removeUserFromChannel(request: any, response: any) {
+  static removeUserFromChannel: RequestHandler = (request, response) => {
+    if (!request.clientManager) throw new Error('ClientManager is not available');
+
     request.clientManager.logger.debug('Route callback: removeUserFromChannel');
 
     const uid = request.params.uid || '';
@@ -163,7 +185,9 @@ export class Routes {
   /**
    * Add a channel.
    */
-  addChannel(request: any, response: any) {
+  static addChannel: RequestHandler = (request, response) => {
+    if (!request.clientManager) throw new Error('ClientManager is not available');
+
     request.clientManager.logger.debug('Route callback: addChannel');
 
     const channel = request.params.channel || '';
@@ -191,19 +215,25 @@ export class Routes {
   /**
    * Http callback - read in a JSON message and publish it to interested clients.
    */
-  healthCheck(request: any, response: any) {
+  static healthCheck: RequestHandler = (request, response) => {
+    if (!request.clientManager) throw new Error('ClientManager is not available');
+
     request.clientManager.logger.debug('Route callback: healthCheck');
 
-    const data = request.clientManager.getStats();
-    data.status = 'success';
-    data.version = global.version;
+    const data = {
+      ...request.clientManager.getStats(),
+      status: 'success',
+      version: global.version,
+    };
     response.send(data);
   }
 
   /**
    * Checks whether a channel exists.
    */
-  checkChannel(request: any, response: any) {
+  static checkChannel: RequestHandler = (request, response) => {
+    if (!request.clientManager) throw new Error('ClientManager is not available');
+
     request.clientManager.logger.debug('Route callback: checkChannel');
 
     const channel = request.params.channel || '';
@@ -232,7 +262,9 @@ export class Routes {
   /**
    * Remove a channel.
    */
-  removeChannel(request: any, response: any) {
+  static removeChannel: RequestHandler = (request, response) => {
+    if (!request.clientManager) throw new Error('ClientManager is not available');
+
     request.clientManager.logger.debug('Route callback: removeChannel');
 
     const channel = request.params.channel || '';
@@ -260,24 +292,26 @@ export class Routes {
   /**
    * Set the list of users a uid can see presence info about.
    */
-  setUserPresenceList(request: any, response: any) {
+  static setUserPresenceList: RequestHandler = (request, response) => {
+    if (!request.clientManager) throw new Error('ClientManager is not available');
+
     request.clientManager.logger.debug('Route callback: setUserPresenceList');
 
     const uid = request.params.uid || '';
-    const uidlist = request.params.uidlist.split(',') || [];
-    if (uid && uidlist) {
+    const uidList = request.params.uidlist.split(',') || [];
+    if (uid && uidList) {
       if (!/^\d+$/.test(uid)) {
         request.clientManager.logger.log('Invalid uid: ' + uid);
         response.send({ status: 'failed', error: 'Invalid uid.' });
         return;
       }
-      if (uidlist.length === 0) {
+      if (uidList.length === 0) {
         request.clientManager.logger.log('Empty uidlist');
         response.send({ status: 'failed', error: 'Empty uid list.' });
         return;
       }
 
-      const result = request.clientManager.setUserPresenceList(uid, uidlist);
+      const result = request.clientManager.setUserPresenceList(uid, uidList);
       if (result) {
         response.send({ status: 'success' });
       }
@@ -288,12 +322,15 @@ export class Routes {
     else {
       response.send({ status: 'failed', error: 'Invalid parameters.' });
     }
+    return;
   }
 
   /**
    * Http callback - return the list of content channel users.
    */
-  getContentTokenUsers(request: any, response: any) {
+  static getContentTokenUsers: RequestHandler = (request, response) => {
+    if (!request.clientManager) throw new Error('ClientManager is not available');
+
     request.clientManager.logger.debug('Route callback: getContentTokenUsers');
     request.clientManager.logger.debug('Body', request.body);
 
@@ -311,7 +348,9 @@ export class Routes {
   /**
    * Set a content token.
    */
-  setContentToken(request: any, response: any) {
+  static setContentToken: RequestHandler = (request, response) => {
+    if (!request.clientManager) throw new Error('ClientManager is not available');
+
     request.clientManager.logger.debug('Route callback: setContentToken');
     request.clientManager.logger.debug('Body', request.body);
 
@@ -328,7 +367,9 @@ export class Routes {
   /**
    * Publish a message to clients subscribed to a channel.
    */
-  publishMessageToContentChannel(request: any, response: any) {
+  static publishMessageToContentChannel: RequestHandler = (request, response) => {
+    if (!request.clientManager) throw new Error('ClientManager is not available');
+
     request.clientManager.logger.debug('Route callback: publishMessageToContentChannel');
     request.clientManager.logger.debug('Body', request.body);
 
@@ -354,7 +395,9 @@ export class Routes {
    * Add an authToken to a channel.
    * @TODO Unused, needs testing.
    */
-  addAuthTokenToChannel(request: any, response: any) {
+  static addAuthTokenToChannel: RequestHandler = (request, response) => {
+    if (!request.clientManager) throw new Error('ClientManager is not available');
+
     request.clientManager.logger.debug('Route callback: addAuthTokenToChannel');
 
     const authToken = request.params.authToken || '';
@@ -384,7 +427,9 @@ export class Routes {
    * Remove an authToken from a channel.
    * @TODO Unused, needs testing.
    */
-  removeAuthTokenFromChannel(request: any, response: any) {
+  static removeAuthTokenFromChannel: RequestHandler = (request, response) => {
+    if (!request.clientManager) throw new Error('ClientManager is not available');
+
     request.clientManager.logger.debug('Route callback: removeAuthTokenFromChannel');
 
     const authToken = request.params.authToken || '';
@@ -413,7 +458,9 @@ export class Routes {
   /**
    * Http callback - set the debug flag.
    */
-  toggleDebug(request: any, response: any) {
+  static toggleDebug: RequestHandler = (request, response) => {
+    if (!request.clientManager) throw new Error('ClientManager is not available');
+
     request.clientManager.logger.debug('Route callback: toggleDebug');
 
     if (!request.body.debug) {
@@ -428,7 +475,9 @@ export class Routes {
   /**
    * Sends a 404 message.
    */
-  send404(request: any, response: any) {
+  static send404: RequestHandler = (request, response) => {
+    if (!request.clientManager) throw new Error('ClientManager is not available');
+
     request.clientManager.logger.debug('Route callback: send404');
 
     response.status(404).send('Not Found.'); // tslint:disable-line:no-magic-numbers

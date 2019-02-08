@@ -1,6 +1,7 @@
 {
   "extends": "tslint-config-airbnb-base",
   "rules": {
-    "brace-style": false
+    "brace-style": false,
+    "no-null-keyword": true
   }
 }

@@ -3,21 +3,40 @@
  */
 
 import { Logger } from './utility';
+import { IDrupalNodejsSettings } from './config-manager';
+import { Backend } from './backend';
 
 export class ClientManager {
-  settings: any;
-  backend: any;
-  authenticatedClients: any = {};
-  preAuthSockets: any = {};
-  sockets: any = {};
-  onlineUsers: any = {};
-  tokenChannels: any = {};
-  presenceTimeoutIds: any = {};
-  contentChannelTimeoutIds: any = {};
-  channels: any = {};
+  settings: IDrupalNodejsSettings;
+  backend: Backend;
+  authenticatedClients: {
+    [authToken: string]: {
+      uid: number,
+      channels: string[],
+    },
+  } = {};
+  preAuthSockets: { [socketId: string]: SocketIO.Socket } = {};
+  sockets: { [socketId: string]: SocketIO.Socket } = {};
+  onlineUsers: { [uid: number]: number[] } = {};
+  tokenChannels: {
+    [channel: string]: {
+      tokens: any,
+      sockets: any,
+    },
+  } = {};
+  presenceTimeoutIds: { [uid: number]: NodeJS.Timeout } = {};
+  contentChannelTimeoutIds: { [tokenChannelUid: string]: NodeJS.Timeout } = {};
+  channels: {
+    [channel: string]: {
+      sessionIds: {
+        [sessionId: string]: string,
+      },
+      isClientWritable?: boolean,
+    },
+  } = {};
   logger: Logger;
 
-  constructor(settings: any, backend: any) {
+  constructor(settings: IDrupalNodejsSettings, backend: Backend) {
     this.settings = settings;
     this.backend = backend;
     this.logger = new Logger(this.settings);
@@ -25,10 +44,9 @@ export class ClientManager {
 
   /**
    * Registers a socket in the internal store.
-   * @param socket
-   *   A socket object.
+   * @param socket A socket object.
    */
-  addSocket(socket: any) {
+  addSocket(socket: SocketIO.Socket) {
     this.preAuthSockets[socket.id] = socket;
 
     process.emit('client-connection', socket.id);
@@ -53,7 +71,7 @@ export class ClientManager {
   /**
    * Check if the given channel is client-writable.
    */
-  channelIsClientWritable(channel: any) {
+  channelIsClientWritable(channel: string) {
     if (this.channels.hasOwnProperty(channel)) {
       return this.channels[channel].isClientWritable;
     }
@@ -63,7 +81,7 @@ export class ClientManager {
   /**
    * Check if the given socket is in the given channel.
    */
-  clientIsInChannel(socketId: any, channel: any) {
+  clientIsInChannel(socketId: string, channel: string) {
     if (!this.channels.hasOwnProperty(channel)) {
       return false;
     }
@@ -73,23 +91,23 @@ export class ClientManager {
   /**
    * Authenticate a client connection based on the message it sent.
    */
-  authenticateClient(client: any, message: any, ackCallback: any) {
+  authenticateClient(clientSocket: SocketIO.Socket, message: any, ackCallback: any) {
     this.logger.debug(`authenticateClient: Authenticating client with key ${message.authToken}`);
 
     if (this.authenticatedClients[message.authToken]) {
       // tslint:disable-next-line:ter-max-len
-      this.logger.debug(`authenticateClient: Reusing existing authentication data for key: ${message.authToken}, client id: ${client.id}`);
+      this.logger.debug(`authenticateClient: Reusing existing authentication data for key: ${message.authToken}, client id: ${clientSocket.id}`);
       // setupClientConnection() copies the socket from preAuthSockets to
       // sockets.
       this.setupClientConnection(
-        client.id,
+        clientSocket.id,
         this.authenticatedClients[message.authToken],
         message.contentTokens,
       );
     }
     else {
       message.messageType = 'authenticate';
-      message.clientId = client.id;
+      message.clientId = clientSocket.id;
       this.backend.sendMessageToBackend(
         message,
         (error: any, response: any, body: any) => {
@@ -108,7 +126,7 @@ export class ClientManager {
   /**
    * Adds the socket to a token channel.
    */
-  joinTokenChannel(socketId: any, message: any) {
+  joinTokenChannel(socketId: string, message: any) {
     if (!this.sockets[socketId]) {
       // This socket is not authenticated yet.
       return;
@@ -142,12 +160,10 @@ export class ClientManager {
 
   /**
    * Processes an incoming message event on the socket.
-   * @param socketId
-   *   The socket id that received the message.
-   * @param message
-   *   Arbitrary message object.
+   * @param socketId The socket id that received the message.
+   * @param message Arbitrary message object.
    */
-  processMessage(socketId: any, message: any) {
+  processMessage(socketId: string, message: any) {
     // If the message is from an active client, then process it.
     if (this.sockets[socketId] && message.hasOwnProperty('type')) {
       this.logger.debug('processMessage: Received message from client ' + socketId);
@@ -184,13 +200,13 @@ export class ClientManager {
   /**
    * Handle authentication call response.
    */
-  authenticateClientCallback(error: any, response: any, body: any) {
+  authenticateClientCallback(error: any, response: any, body: string) {
     if (error) {
       this.logger.log('authenticateClientCallback: Error with authenticate client request:', error);
       return false;
     }
-    // tslint:disable-next-line:triple-equals
-    if (response.statusCode == '404') {
+    // tslint:disable-next-line:triple-equals no-magic-numbers
+    if (response.statusCode == 404) {
       this.logger.log('authenticateClientCallback: Backend authentication url not found.');
       this.logger.debug('authenticateClientCallback: Response body', body);
       return false;
@@ -231,7 +247,7 @@ export class ClientManager {
   /**
    * Setup a sockets{}.connection with uid, channels etc.
    */
-  setupClientConnection(sessionId: any, authData: any, contentTokens: any) {
+  setupClientConnection(sessionId: string, authData: any, contentTokens: string[]) {
     if (!this.preAuthSockets[sessionId]) {
       this.logger.log("setupClientConnection: Client socket '" + sessionId + "' went away.");
       return;
@@ -298,7 +314,7 @@ export class ClientManager {
   /**
    * Send a presence notification for uid.
    */
-  sendPresenceChangeNotification(uid: any, presenceEvent: any) {
+  sendPresenceChangeNotification(uid: number, presenceEvent: any) {
     if (this.onlineUsers[uid]) {
       for (const i in this.onlineUsers[uid]) {
         if (this.onlineUsers[uid].hasOwnProperty(i)) {
@@ -328,7 +344,7 @@ export class ClientManager {
   /**
    * Get the list of Node.js sessionIds for a given uid.
    */
-  getNodejsSessionIdsFromUid(uid: any) {
+  getNodejsSessionIdsFromUid(uid: number) {
     const sessionIds = [];
     for (const sessionId in this.sockets) {
       // tslint:disable-next-line:triple-equals
@@ -345,7 +361,7 @@ export class ClientManager {
   /**
    * Cleanup after a socket has disconnected.
    */
-  cleanupSocket(socket: any) {
+  cleanupSocket(socket: SocketIO.Socket) {
     process.emit('client-disconnect', socket.id);
 
     this.logger.debug('cleanupSocket: Cleaning up after socket id ' + socket.id + ', uid ' + socket.uid);
@@ -386,13 +402,10 @@ export class ClientManager {
               clearTimeout(this.contentChannelTimeoutIds[`${tokenChannel}_${uid}`]);
             }
 
-            const timeoutFunction = () => {
+            // tslint:disable-next-line:ter-max-len
+            this.contentChannelTimeoutIds[`${tokenChannel}_${uid}`] = setTimeout(() => {
               this.checkTokenChannelStatus(tokenChannel, uid);
-            };
-
-            this.contentChannelTimeoutIds[`${tokenChannel}_${uid}`] = (
-              setTimeout(timeoutFunction, 2000) // tslint:disable-line:no-magic-numbers
-            );
+            }, 2000); // tslint:disable-line:no-magic-numbers
           }
 
           delete this.tokenChannels[tokenChannel].sockets[socket.id];
@@ -406,7 +419,7 @@ export class ClientManager {
   /**
    * Check for any open sockets for uid.
    */
-  checkOnlineStatus(uid: any) {
+  checkOnlineStatus(uid: number) {
     if (this.getNodejsSessionIdsFromUid(uid).length === 0) {
       this.logger.debug(`checkOnlineStatus: Sending offline notification for ${uid}`);
 
@@ -417,7 +430,7 @@ export class ClientManager {
   /**
    * Sends offline notification to sockets, the backend and cleans up our list.
    */
-  setUserOffline(uid: any) {
+  setUserOffline(uid: number) {
     this.sendPresenceChangeNotification(uid, 'offline');
     delete this.onlineUsers[uid];
     this.backend.sendMessageToBackend(
@@ -430,13 +443,13 @@ export class ClientManager {
   /**
    * Kicks a user.
    */
-  kickUser(uid: any) {
+  kickUser(uid: number) {
     // Delete the user from the authenticatedClients hash.
-    for (const authToken in this.authenticatedClients) {
+    Object.keys(this.authenticatedClients).forEach((authToken) => {
       if (this.authenticatedClients[authToken].uid === uid) {
         delete this.authenticatedClients[authToken];
       }
-    }
+    });
 
     // Destroy any socket connections associated with this uid.
     for (const clientId in this.sockets) {
@@ -462,7 +475,7 @@ export class ClientManager {
    * @return
    *   True on success, false if the client is not found.
    */
-  addUserToChannel(channel: any, uid: any) {
+  addUserToChannel(channel: string, uid: number) {
     this.channels[channel] = this.channels[channel] || { sessionIds: {} };
 
     const sessionIds = this.getNodejsSessionIdsFromUid(uid);
@@ -501,7 +514,7 @@ export class ClientManager {
   /**
    * Get the list of Node.js sessionIds for a given authToken.
    */
-  getNodejsSessionIdsFromAuthToken(authToken: any) {
+  getNodejsSessionIdsFromAuthToken(authToken: string) {
     const sessionIds = [];
     for (const sessionId in this.sockets) {
       if (this.sockets[sessionId].authToken === authToken) {
@@ -518,7 +531,7 @@ export class ClientManager {
    * Add an authToken to a channel.
    * @TODO Unused, needs testing.
    */
-  addAuthTokenToChannel(channel: any, authToken: any) {
+  addAuthTokenToChannel(channel: string, authToken: string) {
     if (!this.authenticatedClients[authToken]) {
       this.logger.log('addAuthTokenToChannel: Unknown authToken: ' + authToken);
       return false;
@@ -555,7 +568,7 @@ export class ClientManager {
    * Remove an authToken from a channel.
    * @TODO Unused, needs testing.
    */
-  removeAuthTokenFromChannel(channel: any, authToken: any) {
+  removeAuthTokenFromChannel(channel: string, authToken: string) {
     if (!this.authenticatedClients[authToken]) {
       this.logger.log('removeAuthTokenFromChannel: Invalid authToken: ' + authToken);
       return false;
@@ -589,7 +602,7 @@ export class ClientManager {
    * Add a client (specified by session ID) to a channel.
    * @TODO: Unused. Shall we keep it?
    */
-  addClientToChannel(sessionId: any, channel: any) {
+  addClientToChannel(sessionId: string, channel: string) {
     if (sessionId && channel) {
       if (!this.sockets.hasOwnProperty(sessionId)) {
         this.logger.log(`addClientToChannel: Invalid sessionId: ${sessionId}`);
@@ -616,7 +629,7 @@ export class ClientManager {
    * Remove a client (specified by session ID) from a channel.
    * @TODO: Unused. Shall we keep it?
    */
-  removeClientFromChannel(sessionId: any, channel: any) {
+  removeClientFromChannel(sessionId: string, channel: string) {
     if (sessionId && channel) {
       if (!this.sockets.hasOwnProperty(sessionId)) {
         this.logger.log(`removeClientFromChannel: Invalid sessionId: ${sessionId}`);
@@ -644,7 +657,7 @@ export class ClientManager {
    * @return
    *   True on success, false if the client is not found.
    */
-  removeUserFromChannel(channel: any, uid: any) {
+  removeUserFromChannel(channel: string, uid: number) {
     if (this.channels[channel]) {
       const sessionIds = this.getNodejsSessionIdsFromUid(uid);
       for (const i in sessionIds) {
@@ -678,7 +691,7 @@ export class ClientManager {
   /**
    * Add a channel.
    */
-  addChannel(channel: any) {
+  addChannel(channel: string) {
     if (this.channels[channel]) {
       this.logger.log(`addChannel: Channel name '${channel}' already exists.`);
       return false;
@@ -711,7 +724,7 @@ export class ClientManager {
    * @return
    *   True on success false on error.
    */
-  checkChannel(channel: any) {
+  checkChannel(channel: string) {
     if (this.channels[channel]) {
       this.logger.log(`checkChannel: Channel name '${channel}' is active on the server.`);
       return true;
@@ -728,7 +741,7 @@ export class ClientManager {
    * @return
    *   True on success false on error.
    */
-  removeChannel(channel: any) {
+  removeChannel(channel: string) {
     if (this.channels[channel]) {
       delete this.channels[channel];
 
@@ -744,20 +757,22 @@ export class ClientManager {
   /**
    * Set the list of users a uid can see presence info about.
    */
-  setUserPresenceList(uid: any, uidList: any) {
+  setUserPresenceList(uid: number, uidList: number[]) {
     for (const i in uidList) {
-      if (!/^\d+$/.test(uidList[i])) {
+      if (!/^\d+$/.test(uidList[i].toString())) {
         this.logger.log(`setUserPresenceList: Invalid uid: ${uid}`);
         return false;
       }
     }
     this.onlineUsers[uid] = uidList;
+
+    return true;
   }
 
   /**
    * Get the list of backend uids and authTokens connected to a content token channel.
    */
-  getContentTokenChannelUsers(channel: any) {
+  getContentTokenChannelUsers(channel: string) {
     const users = { uids: new Array(), authTokens: new Array() };
 
     if (!channel || !this.tokenChannels[channel]) {
@@ -778,7 +793,7 @@ export class ClientManager {
   /**
    * Set a content token.
    */
-  setContentToken(channel: any, token: any, value: any) {
+  setContentToken(channel: string, token: string, value: string) {
     this.tokenChannels[channel] = this.tokenChannels[channel] || { tokens: {}, sockets: {} };
     this.tokenChannels[channel].tokens[token] = value;
   }
@@ -788,7 +803,7 @@ export class ClientManager {
    * @return
    *   True on success; false on error.
    */
-  publishMessageToContentChannel(channel: any, message: any) {
+  publishMessageToContentChannel(channel: string, message: any) {
     if (!this.tokenChannels.hasOwnProperty(channel)) {
       this.logger.log('publishMessageToContentChannel: The channel ' + channel + " doesn't exist.");
       return false;
@@ -805,7 +820,7 @@ export class ClientManager {
   /**
    * Logout the given user from the server.
    */
-  logoutUser(authToken: any) {
+  logoutUser(authToken: string) {
     // Delete the user from the authenticatedClients hash.
     delete this.authenticatedClients[authToken];
 
@@ -823,7 +838,7 @@ export class ClientManager {
   /**
    * Check for any open sockets associated with the channel and socket pair.
    */
-  checkTokenChannelStatus(tokenChannel: any, uid: any) {
+  checkTokenChannelStatus(tokenChannel: string, uid: number) {
     // If the tokenChannel no longer exists, just bail.
     if (!this.tokenChannels[tokenChannel]) {
       this.logger.log(`checkTokenChannelStatus: no tokenChannel ${tokenChannel}`);
@@ -860,16 +875,16 @@ export class ClientManager {
   /**
    * Publish a message to a specific client.
    */
-  publishMessageToClient(sessionId: any, message: any) {
+  publishMessageToClient(sessionId: string, message: any) {
     if (this.sockets[sessionId]) {
       this.sockets[sessionId].json.send(message);
 
       this.logger.debug(`publishMessageToClient: Sent message to client ${sessionId}`);
-
       return true;
     }
 
     this.logger.log(`publishMessageToClient: Failed to find client ${sessionId}`);
+    return false;
   }
 
   /**

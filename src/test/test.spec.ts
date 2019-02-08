@@ -1,4 +1,4 @@
-import { ConfigManager } from '../lib/config-manager';
+import { ConfigManager, IDrupalNodejsSettings, IDrupalBackendSettings } from '../lib/config-manager';
 import { DrupalServer } from '../lib/server';
 
 import 'ts-mocha';
@@ -14,7 +14,7 @@ describe('Server app', function () {
 
   let client: any;
 
-  const settings = {
+  const nodeSettings: IDrupalNodejsSettings = {
     scheme: 'http',
     port: 8080,
     host: 'localhost',
@@ -29,42 +29,44 @@ describe('Server app', function () {
     transports: ['websocket', 'polling'],
     jsMinification: true,
     jsEtag: true,
-    backend: {
-      host: 'localhost',
-      scheme: 'http',
-      port: 8000,
-      basePath: '/',
-      strictSSL: false,
-      messagePath: 'nodejs/message',
-      httpAuth: '',
-    },
-    test: {
-      authToken: 'lol_test_auth_token',
-      uid: 666,
-      clientId: 'lotestclientid',
-    },
     logLevel: 1,
   };
 
+  const backendSettings: IDrupalBackendSettings = {
+    host: 'localhost',
+    scheme: 'http',
+    port: 8000,
+    basePath: '/',
+    strictSSL: false,
+    messagePath: 'nodejs/message',
+    httpAuth: '',
+  };
+
+  const testSettings = {
+    authToken: 'lol_test_auth_token',
+    uid: 666,
+    clientId: 'lotestclientid',
+  };
+
   const serverUrl = format({
-    protocol: settings.scheme,
-    hostname: settings.host,
-    port: settings.port,
-    pathname: settings.baseAuthPath,
+    protocol: nodeSettings.scheme,
+    hostname: nodeSettings.host,
+    port: nodeSettings.port,
+    pathname: nodeSettings.baseAuthPath,
   });
 
   const backendHost = format({
-    protocol: settings.backend.scheme,
-    hostname: settings.backend.host,
-    port: settings.backend.port,
+    protocol: backendSettings.scheme,
+    hostname: backendSettings.host,
+    port: backendSettings.port,
   });
-  const backendMessagePath = settings.backend.basePath + settings.backend.messagePath;
+  const backendMessagePath = backendSettings.basePath + backendSettings.messagePath;
 
   const requestOptions: any = {
     url: serverUrl,
     json: true,
     headers: {
-      NodejsServiceKey: settings.serviceKey,
+      NodejsServiceKey: nodeSettings.serviceKey,
     },
   };
 
@@ -74,16 +76,14 @@ describe('Server app', function () {
 
   const authResult = {
     nodejsValidAuthToken: true,
-    clientId: settings.test.clientId,
+    clientId: testSettings.clientId,
     channels: [],
-    uid: settings.test.uid,
+    uid: testSettings.uid,
   };
 
   before(() => {
-    const config = new ConfigManager();
-    config.setSettings(settings);
-    const server = new DrupalServer();
-    server.start(config);
+    const config = new ConfigManager(nodeSettings, backendSettings);
+    DrupalServer.start(config);
   });
 
   after(() => {
@@ -159,7 +159,7 @@ describe('Server app', function () {
   });
 
   it('should allow client connections with valid tokens', (done: any) => {
-    client = connect(settings.scheme + '://' + settings.host + ':' + settings.port);
+    client = connect(nodeSettings.scheme + '://' + nodeSettings.host + ':' + nodeSettings.port);
     client.on('connect', () => {
       authResult.clientId = client.nsp + '#' + client.id;
       nock(backendHost).post(
@@ -169,7 +169,7 @@ describe('Server app', function () {
         200, // tslint:disable-line:no-magic-numbers
         authResult,
       );
-      client.emit('authenticate', { authToken: settings.test.authToken }, (response: any) => {
+      client.emit('authenticate', { authToken: testSettings.authToken }, (response: any) => {
         equal(response.result, 'success');
         done();
       });
@@ -177,7 +177,7 @@ describe('Server app', function () {
   });
 
   it('should disconnect client connections with invalid tokens', (done: any) => {
-    client = connect(settings.scheme + '://' + settings.host + ':' + settings.port);
+    client = connect(nodeSettings.scheme + '://' + nodeSettings.host + ':' + nodeSettings.port);
     client.on('connect', () => {
       authResult.clientId = client.nsp + '#' + client.id;
       authResult.nodejsValidAuthToken = false;
