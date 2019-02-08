@@ -12,11 +12,6 @@ https://www.drupal.org/project/nodejs
 
 Use the following method to download the app:
 
-* Download the
-  [latest release](https://github.com/casmbu/drupal-nodejs-typescript/releases) from
-  GitHub. Unzip, and run `npm install` in the app's directory to install the
-  dependencies.
-
 * Git clone this repository. Go to the root directory of the repo and run
   `npm install` followed by `npm run build` (without the example extension) or
   `npm run build_all` (with the example extension). The dist folder will contain
@@ -55,7 +50,7 @@ practical to run the app in the background. One way to achieve this is starting
 the app with [pm2](https://github.com/Unitech/pm2).
 
 ```
-pm2 start app.js
+pm2 start app.bundle.js
 ```
 
 Not only will pm2 start the app in the background, but it will monitor it and
